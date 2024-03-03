@@ -76,12 +76,9 @@ class Diffusion_Worker(nn.Module):
                                           out_channels = self.args.pred_len*self.args.num_vars,
                                           kernel_size=1,
                                           groups = self.args.num_vars)
-        self.cnndec = torch.nn.Conv1d(in_channels = self.args.seq_len*self.args.num_vars,
-                                          out_channels = self.args.pred_len*self.args.num_vars,
-                                          kernel_size=1,
-                                          groups = self.args.num_vars)
         self.linearproj= nn.Linear(self.args.seq_len,self.args.pred_len)
-        self.projtype='linear'
+        self.projtype='CNN'
+
     def set_new_noise_schedule(self, given_betas=None, beta_schedule="linear", diff_steps=1000, beta_start=1e-4, beta_end=2e-2
     ):  
         if exists(given_betas):
@@ -206,28 +203,15 @@ class Diffusion_Worker(nn.Module):
                 cond_ts=cond_ts.squeeze(-1).reshape(B,N,-1)            
                 L = np.shape(cond_ts)[2]
                 cond_ts = torch.reshape(cond_ts,(B*N,L))
+            #noise = torch.randn_like(cond_ts)
+            #x_k = self.noise_ts(x_start=cond_ts, t=t, noise=noise)
             t = torch.randint(0, self.num_timesteps, size=[(B*N)//2,]).long().to(self.device)
             t = torch.cat([t, self.num_timesteps-1-t], dim=0)           
-            model_out= self.nn(cond_ts,t,None)
-            model_out=torch.reshape(model_out,(B,N,L))
+            model_out = self.nn(cond_ts,t,None)
+            model_out = torch.reshape(model_out,(B,N,L))
             model_out = model_out.permute(0,2,1) #(B,TARGET L,N)
-            model_out=self.revin_layer(model_out,'denorm')
-            model_out = model_out.permute(0,2,1)  #(B,N,TARGET L)
-            '''
-            model_out,_ = self.sampler.sample(S=20,
-                                    conditioning=None,
-                                    batch_size=B*N,
-                                    shape=[1,L],
-                                    verbose=False,
-                                    unconditional_guidance_scale=1.0,
-                                    unconditional_conditioning=None,
-                                    eta=0.,
-                                    x_T=cond_ts)
-            model_out=torch.reshape(model_out,(B,N,L))
-            model_out = model_out.permute(0,2,1).to(self.device) #(B,TARGET L,N)
             model_out = self.revin_layer(model_out,'denorm')
             model_out = model_out.permute(0,2,1)  #(B,N,TARGET L)
-            '''
         if self.parameterization == "noise":
             target = noise 
         elif self.parameterization == "x_start":
@@ -253,7 +237,10 @@ class Diffusion_Worker(nn.Module):
         if self.conditional:
             B = np.shape(conditioning)[0]
             N = self.args.num_vars
-            conditioning=torch.reshape(conditioning,(B*N,-1))
+            conditioning = conditioning.permute(0,2,1) #(B,L,N)
+            conditioning = self.revin_layer(conditioning,'norm')
+            conditioning = conditioning.permute(0,2,1) #(B,N,L)
+            conditioning = torch.reshape(conditioning,(B*N,-1))
             samples_ddim ,_= self.sampler.sample(S=20,
                                              conditioning=conditioning,
                                              batch_size=batch_size,
@@ -282,6 +269,8 @@ class Diffusion_Worker(nn.Module):
                 x_T=x_T.squeeze(-1).reshape(B,N,-1)      #(B,N,TARGET L)
                 L = np.shape(x_T)[2]
                 x_T = torch.reshape(x_T,(B*N,L))
+            #noise = torch.randn_like(x_T)
+            #x_k = self.noise_ts(x_start=x_T, t=t, noise=noise)
             samples_ddim ,_= self.sampler.sample(S=20,
                                              conditioning=conditioning,
                                              batch_size=batch_size,
