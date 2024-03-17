@@ -1,1 +1,0 @@
-python -u main_ddpm.py --seq_len 1440 --pred_len 168 --dataset_name ETTh1 --features M --num_vars 7 --pretrain_epochs 0 --train_epochs 100 --batch_size 64 --test_batch_size 64 --devices 0
