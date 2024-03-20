@@ -113,7 +113,7 @@ parser.add_argument('--skip_dropout', type=float, default=0.5, help='skip dropou
 parser.add_argument('--data_dropout', type=float, default=0., help='data dropout')
 parser.add_argument('--sample_times', type=int, default=1)
 parser.add_argument('--test_vit', type=bool, default=False)
-parser.add_argument('--do_mask', type=bool, default=True)
+parser.add_argument('--do_mask', type=bool, default=False)
 args = parser.parse_args()
 
 args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
